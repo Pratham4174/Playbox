@@ -1,7 +1,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   Alert,
@@ -54,39 +54,6 @@ export default function BookingPage({ route, navigation }: any) {
   const [selectedCourt, setSelectedCourt] = useState<Court | null>(null);
 
 
-
-
-  //handle booking
-  
-
-  
-  
-
-const fetchBookedDates = async () => {
-  try {
-    const response = await fetch(`http://localhost:8091/api/bookings/venue/${venue.id}`);
-    const bookings = await response.json();
-
-    const markedDates: { [key: string]: any } = {};
-
-    bookings.forEach((booking: any) => {
-      const date = new Date(booking.startTime).toISOString().split('T')[0];
-      markedDates[date] = {
-        disabled: true,
-        disableTouchEvent: true,
-        marked: true,
-        dotColor: '#f44336',
-        selectedColor: '#f44336',
-      };
-    });
-
-    setBookedDates(markedDates);
-  } catch (error) {
-    console.error('Error fetching booked dates:', error);
-  }
-};
-
-
   // Generate time slots from 6 AM to 11 PM
   const generateTimeSlots = () => {
     const slots = [];
@@ -132,62 +99,81 @@ const fetchBookedDates = async () => {
       Alert.alert("Error", "Please select continuous slots without gaps or booked times.");
     }
   };
-  const fetchBookedSlots = async () => {
+
+
+// 1. First, declare fetchBookedSlots using useCallback at the top level of your component
+const fetchBookedSlots = useCallback(async (courtId: number) => {
+  if (!selectedSport) return;
+
   try {
     const dateString = selectedDate.toISOString().split('T')[0];
     
-    // Fetch bookings for the specific venue, date, and sport
     const response = await fetch(
-      `http://localhost:8091/api/bookings/venue/${venue.id}/date/${dateString}?sport=${selectedSport}`
+      `http://localhost:8091/api/bookings/venuebycourt/${venue.id}/date/${dateString}?sport=${selectedSport}&courtId=${courtId}`
     );
+
+    if (!response.ok) throw new Error('Failed to fetch booked slots');
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch booked slots');
-    }
-    
-    const bookings = await response.json();
+    const bookedSlots = await response.json();
     const bookedTimeSlots: string[] = [];
 
-    // Process each booking to extract time slots
-    bookings.forEach((booking: any) => {
-      const start = new Date(booking.startTime);
-      const end = new Date(booking.endTime);
+    bookedSlots.forEach((slot: any) => {
+      const start = new Date(slot.startTime);
+      const end = new Date(slot.endTime);
 
-      // Convert to local time string format (e.g., "4:00 PM")
-      const startSlot = start.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-      
-      const endSlot = end.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-
-      // Add all hours between start and end
       let current = new Date(start);
       while (current < end) {
-        const slot = current.toLocaleTimeString([], {
+        const timeString = current.toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
           hour12: true
         });
-        if (!bookedTimeSlots.includes(slot)) {
-          bookedTimeSlots.push(slot);
+        
+        if (!bookedTimeSlots.includes(timeString)) {
+          bookedTimeSlots.push(timeString);
         }
         current.setHours(current.getHours() + 1);
       }
     });
 
-    console.log(`Booked slots for ${selectedSport}:`, bookedTimeSlots);
     setBookedSlots(bookedTimeSlots);
   } catch (error) {
     console.error('Error fetching booked slots:', error);
     setBookedSlots([]);
   }
-};
+}, [selectedDate, selectedSport, venue.id]);
+
+// 2. Then use it in your useEffect
+useEffect(() => {
+  const fetchData = async () => {
+    if (!selectedSport) return;
+
+    try {
+      // Fetch available courts
+      const courtsResponse = await fetch(
+        `http://localhost:8091/api/bookings/courts?venueId=${venue.id}&sport=${selectedSport}`
+      );
+      const courtsData = await courtsResponse.json();
+      setCourts(courtsData);
+
+      // Fetch booked slots if courts exist
+      if (courtsData.length > 0) {
+        const firstCourt = courtsData[0];
+        setSelectedCourt(firstCourt);
+        console.log('Auto-selected court:', firstCourt);
+        await fetchBookedSlots(courtsData[0].id);
+      } else {
+        setSelectedCourt(null);
+        setBookedSlots([]);
+        setBookedSlots([]); // Clear slots if no courts
+      }
+    } catch (error) {
+      console.error('Error fetching courts:', error);
+    }
+  };
+
+  fetchData();
+}, [selectedDate, selectedSport, venue.id, fetchBookedSlots]); // Dependencies for the callback
   
   useEffect(() => {
   const initBookingScreen = async () => {
@@ -221,16 +207,9 @@ const fetchBookedDates = async () => {
   initBookingScreen();
 }, []); // <- run only once on mount
 
-// ✅ Fetch booked slots whenever sport or date changes
-useEffect(() => {
-  if (selectedSport) {
-    fetch(`http://localhost:8091/api/booking/?venueId=${venue.id}&sport=${selectedSport}`)
-      .then(res => res.json())
-      .then(data => setCourts(data));
-  }
-    fetchBookedSlots();
- 
-}, [selectedDate, selectedSport]);
+
+
+
 
   
   const handleDateSelect = (day: { dateString: string } | undefined) => {
@@ -295,26 +274,9 @@ if (isBooked) return 'booked';
 
 
   return 'available';
-  const handleTimeSlotPress = (time: string, status: string) => {
-    if (status !== 'available') return;
-
-    const updatedSelectedTimes = [...selectedTimes];
-    if (updatedSelectedTimes.includes(time)) {
-      const index = updatedSelectedTimes.indexOf(time);
-      updatedSelectedTimes.splice(index, 1);
-    } else {
-      // Only allow selecting one time slot for this implementation
-      updatedSelectedTimes.length = 0; // Clear previous selection
-      updatedSelectedTimes.push(time);
-    }
-
-    setSelectedTimes(updatedSelectedTimes);
-  };
+ 
 };
-  const handleDurationChange = (value: number) => {
-    const newDuration = Math.max(1, Math.min(4, duration + value));
-    setDuration(newDuration);
-  };
+  
 
 const handleConfirm = async () => {
   if (!userId) {
@@ -333,6 +295,7 @@ const handleConfirm = async () => {
     Alert.alert('Invalid Date', 'You cannot book for past dates.');
     return;
   }
+  
 
   try {
     const storedUserId = await AsyncStorage.getItem('userId');
@@ -341,6 +304,7 @@ const handleConfirm = async () => {
     const parsedUserId = storedUserId ? parseInt(storedUserId) : null;
     const user = storedUser ? JSON.parse(storedUser) : null;
     const userName = user?.name || 'Guest';
+    const duration = selectedTimes.length;
 
     const [time, period] = selectedTimes[0].split(' ');
     const [hours, minutes] = time.split(':').map(Number);
@@ -454,7 +418,10 @@ const handleConfirm = async () => {
             styles.sportButton,
             selectedCourt?.id === court.id && styles.selectedSportButton
           ]}
-          onPress={() => setSelectedCourt(court)}
+          onPress={() => {
+            setSelectedCourt(court); // Store the entire court object
+            fetchBookedSlots(court.id); // Fetch slots for this court
+          }}
         >
           <Text style={[
             styles.sportText,
@@ -585,7 +552,10 @@ const handleConfirm = async () => {
       selected: true,
       selectedColor: '#2E8B57',
       selectedTextColor: '#fff',
+      marked: true,
+      dotColor: '#fff'
     },
+    
   }}
   renderArrow={(direction) => (
     <MaterialIcons 
