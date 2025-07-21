@@ -41,13 +41,13 @@ export default function BookingPage({ route, navigation }: any) {
   const { venue } = route.params;
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [userId, setUserId] = useState<string | null>(null);
-  const [selectedSport, setSelectedSport] = useState<string>('');
+  const [selectedSport, setSelectedSport] = useState<string>(venue.sportPrices[0]?.sport || '' );
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [duration, setDuration] = useState<number>(1);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
-  const [availableSports, setAvailableSports] = useState<string[]>([]);
+  const [availableSports, setAvailableSports] = useState<string[]>(venue.sportPrices.map((sp: any) => sp.sport) );
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [bookedDates, setBookedDates] = useState<{ [date: string]: any }>({});
   const [courts, setCourts] = useState<any[]>([]);
@@ -197,8 +197,9 @@ useEffect(() => {
 
     // ✅ 2. Set default sports
     const defaultSports = ['Football', 'Box Cricket', 'Badminton', 'Basketball'];
-    setAvailableSports(defaultSports);
-    setSelectedSport(defaultSports[0]); // Default sport
+    const venueSports = venue.sportPrices.map((sp: any) => sp.sport);
+    setAvailableSports(venueSports);
+    setSelectedSport(venueSports[0]); // Default sport
 
     // ✅ 3. Generate time slots
     setTimeSlots(generateTimeSlots());
