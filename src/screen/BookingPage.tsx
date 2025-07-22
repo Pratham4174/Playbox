@@ -39,7 +39,7 @@ const toLocalISOString = (date: Date) => {
 };
 export default function BookingPage({ route, navigation }: any) {
   const { venue } = route.params;
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedSport, setSelectedSport] = useState<string>(venue.sportPrices[0]?.sport || '' );
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
@@ -52,7 +52,23 @@ export default function BookingPage({ route, navigation }: any) {
   const [bookedDates, setBookedDates] = useState<{ [date: string]: any }>({});
   const [courts, setCourts] = useState<any[]>([]);
   const [selectedCourt, setSelectedCourt] = useState<Court | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+
+  const getSportPrice = () => {
+    if (!venue?.sportPrices || !selectedSport) return 0;
+    const sport = venue.sportPrices.find((sp: any) => 
+      sp.sport.toLowerCase() === selectedSport.toLowerCase()
+    );
+    return sport ? parseInt(sport.pricePerHour) : 0; // Convert string to number
+  };
+  
+  const calculateTotalPrice = () => {
+    return getSportPrice() * selectedTimes.length;
+  };
+  
+  const totalHours = selectedTimes.length;
+  const totalPrice = calculateTotalPrice();
 
   // Generate time slots from 6 AM to 11 PM
   const generateTimeSlots = () => {
@@ -279,6 +295,8 @@ if (isBooked) return 'booked';
 };
   
 
+// 
+
 const handleConfirm = async () => {
   if (!userId) {
     Alert.alert('Login Required', 'Please log in to confirm your booking.');
@@ -286,7 +304,7 @@ const handleConfirm = async () => {
   }
 
   if (selectedTimes.length === 0) {
-    alert('Please select a time slot');
+    Alert.alert('Error', 'Please select a time slot');
     return;
   }
 
@@ -296,8 +314,15 @@ const handleConfirm = async () => {
     Alert.alert('Invalid Date', 'You cannot book for past dates.');
     return;
   }
-  
 
+  // Show payment confirmation modal
+  setShowPaymentModal(true);
+};
+
+// New function to handle the actual payment and booking
+const handleMakePayment = async () => {
+  setShowPaymentModal(false); // Close the modal
+  
   try {
     const storedUserId = await AsyncStorage.getItem('userId');
     const storedUser = await AsyncStorage.getItem('user');
@@ -331,7 +356,8 @@ const handleConfirm = async () => {
       slotType: hour < 12 ? 'Morning' : hour < 18 ? 'Evening' : 'Night',
       startTime: toLocalISOString(startTime),
       endTime: toLocalISOString(endTime),
-      duration: duration * 60
+      duration: duration * 60,
+      price: venue.sportPrices.find((sp: any) => sp.sport === selectedSport)?.price * duration || 0
     };
 
     const response = await fetch('http://localhost:8091/api/bookings/create', {
@@ -351,15 +377,16 @@ const handleConfirm = async () => {
             .add(duration, 'hours')
             .format('h:mm A')}`,
           duration: `${duration} hour${duration > 1 ? 's' : ''}`,
+          price: bookingPayload.price
         },
       });
     } else {
       const err = await response.json();
-      alert(err.message || 'Booking failed. Try again.');
+      Alert.alert('Booking Failed', err.message || 'Booking failed. Try again.');
     }
   } catch (error) {
     console.error('Booking error:', error);
-    alert('Something went wrong. Please try again later.');
+    Alert.alert('Error', 'Something went wrong. Please try again later.');
   }
 };
 
@@ -531,6 +558,129 @@ const handleConfirm = async () => {
         </View>
       </TouchableOpacity>
 
+  
+{/* Payment Modal */}
+<Modal
+  visible={showPaymentModal}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={() => setShowPaymentModal(false)}
+>
+  <View style={styles.paymentModalContainer}>
+    <View style={styles.paymentModalContent}>
+      {/* Venue Header */}
+      <View style={styles.venueHeader}>
+        <Text style={styles.venueNameText}>{venue.name}</Text>
+      </View>
+
+      {/* Modal Title */}
+      <Text style={styles.paymentModalTitle}>Confirm Your Booking</Text>
+
+      {/* Booking Details */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Booking Details</Text>
+        
+        <View style={styles.detailRow}>
+          <MaterialIcons name="sports-cricket" size={18} color="#2E8B57" style={styles.icon} />
+          <View style={styles.detailTextContainer}>
+            <Text style={styles.detailLabel}>Sport:</Text>
+            <Text style={styles.detailValue}>{selectedSport}</Text>
+          </View>
+        </View>
+
+        <View style={styles.detailRow}>
+          <MaterialIcons name="place" size={18} color="#2E8B57" style={styles.icon} />
+          <View style={styles.detailTextContainer}>
+            <Text style={styles.detailLabel}>Court:</Text>
+            <Text style={styles.detailValue}>{selectedCourt?.name || 'Not selected'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.detailRow}>
+          <MaterialIcons name="calendar-today" size={18} color="#2E8B57" style={styles.icon} />
+          <View style={styles.detailTextContainer}>
+            <Text style={styles.detailLabel}>Date:</Text>
+            <Text style={styles.detailValue}>
+              {selectedDate.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric' 
+              })}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.detailRow}>
+          <MaterialIcons name="access-time" size={18} color="#2E8B57" style={styles.icon} />
+          <View style={styles.detailTextContainer}>
+            <Text style={styles.detailLabel}>Time:</Text>
+            <Text style={styles.detailValue}>
+              {selectedTimes[0]} - {moment(selectedTimes[selectedTimes.length - 1], 'h:mm A')
+                .add(1, 'hour')
+                .format('h:mm A')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.detailRow}>
+          <MaterialIcons name="hourglass-bottom" size={18} color="#2E8B57" style={styles.icon} />
+          <View style={styles.detailTextContainer}>
+            <Text style={styles.detailLabel}>Duration:</Text>
+            <Text style={styles.detailValue}>
+              {totalHours} hour{totalHours > 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
+
+      {/* Payment Summary */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Payment Summary</Text>
+        
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Base Price:</Text>
+          <Text style={styles.priceValue}>₹{getSportPrice()} / hour</Text>
+        </View>
+        
+        <View style={[styles.priceRow, styles.indentedRow]}>
+          <Text style={styles.priceLabel}>× {totalHours} hour{totalHours > 1 ? 's' : ''}</Text>
+          <Text style={styles.priceValue}>₹{getSportPrice() * totalHours}</Text>
+        </View>
+        
+        <View style={styles.divider} />
+        
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total Amount:</Text>
+          <Text style={styles.totalValue}>₹{totalPrice}</Text>
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[styles.button, styles.cancelButton]}
+          onPress={() => setShowPaymentModal(false)}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.button, styles.payButton]}
+          onPress={handleMakePayment}
+        >
+          <Text style={styles.payButtonText}>Pay ₹{totalPrice}</Text>
+          <View style={styles.rewardBadge}>
+            <MaterialIcons name="stars" size={14} color="#FFD700" />
+            <Text style={styles.rewardText}>+3 PlayBox</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
       {/* Calendar Modal */}
       <Modal
         visible={showCalendarModal}
@@ -595,6 +745,162 @@ const handleConfirm = async () => {
 }
 
 const styles = StyleSheet.create({
+  paymentModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  paymentModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '90%',
+    maxWidth: 400,
+  },
+  venueHeader: {
+    backgroundColor: '#2E8B57',
+    paddingVertical: 16,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  venueNameText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  paymentModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginVertical: 16,
+  },
+  sectionContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems:'center',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E8B57',
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    width: '100%',
+    maxWidth: 300, 
+  },
+  icon: {
+    marginRight: 12,
+    width: 24,
+    textAlign: 'center',
+  },
+  detailTextContainer: {
+    flexDirection: 'row',
+    flex: 1,
+    justifyContent: 'space-between', 
+    minWidth: 200,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#666',
+    width: 80,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 8,
+    marginHorizontal: 20,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    width: '100%',
+  maxWidth: 300,
+  },
+  indentedRow: {
+    marginLeft: 20,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  priceValue: {
+    fontSize: 14,
+    color: '#333',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E8B57',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingTop: 12,
+  },
+  button: {
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    flexDirection: 'row',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    marginRight: 12,
+  },
+  payButton: {
+    backgroundColor: '#2E8B57',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  payButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  rewardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  rewardText: {
+    fontSize: 6,
+    color: '#ffffff',
+    marginLeft: 4,
+  },
   container: {
     backgroundColor: '#fff',
     padding: 16,
@@ -637,17 +943,7 @@ const styles = StyleSheet.create({
     color: '#8B7500',
     marginLeft: 2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
+
   sportsContainer: {
     paddingBottom: 8,
   },
@@ -811,4 +1107,111 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+
+
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+
+  paymentButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  paymentButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  confirmButton: {
+    backgroundColor: '#2E8B57',
+    marginLeft: 10,
+  },
+
+  confirmButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+
+  summarySection: {
+    marginBottom: 15,
+  },
+  summaryHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 5,
+  },
+
+
+  priceSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 15,
+    marginBottom: 20,
+  },
+
+  summaryCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+  },
+  priceCard: {
+    backgroundColor: '#f5fff7',
+    borderRadius: 8,
+    padding: 15,
+  },
+  priceHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E8B57',
+    marginBottom: 10,
+  },
+  priceBreakdown: {
+    marginTop: 5,
+  },
+  priceMultiplierRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginLeft: 20,
+    marginBottom: 5,
+  },
+  totalPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  totalPriceLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalPriceValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E8B57',
+  },
+
+
 });

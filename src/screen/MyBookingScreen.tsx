@@ -71,7 +71,7 @@ export default function MyBookingsScreen() {
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.title}>My Bookings</Text>
+      {/* <Text style={styles.title}>My Bookings</Text> */}
 
       {loading ? (
         <ActivityIndicator size="large" color="#2e7d32" />

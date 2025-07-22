@@ -63,6 +63,10 @@ const ProfileScreen = ({ navigation }: any) => {
     ]);
   };
 
+  const handleLoginRedirect = () => {
+    navigation.navigate('PhoneLogin');
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -73,8 +77,24 @@ const ProfileScreen = ({ navigation }: any) => {
 
   if (!user) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>User not logged in.</Text>
+      <View style={styles.mainContainer}>
+        <View style={styles.notLoggedInContainer}>
+          <Image
+            source={require('../../assets/user.png')}
+            style={styles.guestAvatar}
+          />
+          <Text style={styles.notLoggedInTitle}>Welcome Guest</Text>
+          <Text style={styles.notLoggedInText}>
+            Please login to view your profile and access all features
+          </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={handleLoginRedirect}
+          >
+            <Text style={styles.loginButtonText}>Login / Register</Text>
+          </TouchableOpacity>
+        </View>
+        <Footer navigation={navigation} active="Profile" />
       </View>
     );
   }
@@ -130,7 +150,7 @@ const ProfileScreen = ({ navigation }: any) => {
           <ProfileMenuItem 
             icon="calendar-outline" 
             title="My Bookings" 
-            onPress={() => navigation.navigate('MyBookings')} 
+            onPress={() => navigation.navigate('MyBookingScreen')} 
           />
           <ProfileMenuItem 
             icon="card-outline" 
@@ -210,6 +230,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
+  },
+  notLoggedInContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  guestAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 20,
+    opacity: 0.8,
+  },
+  notLoggedInTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  notLoggedInText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  loginButton: {
+    backgroundColor: '#2E8B57',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   profileHeader: {
     alignItems: 'center',

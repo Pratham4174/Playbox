@@ -24,9 +24,9 @@ import ProfilePage from './src/screen/ProfilePage';
 import RecentSearchesScreen from './src/screen/RecentSearchesScreen';
 import SplashScreen from './src/screen/SplashScreen';
 import UserSetupScreen from './src/screen/UserSetupScreen';
-import VenueDetailsScreen from './src/screen/VenueDetailScreen';
 import VenueListScreen from './src/screen/VenueListScreen';
 import ViewBookingsScreen from './src/screen/ViewBookingScreen';
+import VenueDetailsScreen from './src/screen/VenueDetailsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -56,11 +56,11 @@ export default function App() {
 
         
 
-        <Stack.Screen name="VenueDetails" component={VenueDetailsScreen} />
+        {/* <Stack.Screen name="VenueDetails" component={VenueDetailsScreen} options={{headerShown:false}} /> */}
         {/* This is your drawer */}
         <Stack.Screen name="Main" component={MainDrawer} options={{ headerShown: false }} />
+        <Stack.Screen name="VenueDetails" component={VenueDetailsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-
         <Stack.Screen name="BookingConfirmation"  component={BookingConfirmationScreen}  options={{ headerShown: false }}/>
         <Stack.Screen name="CommunityScreen"  component={CommunityScreen}  options={{ headerShown: false }}/>
         {/* Others */}
