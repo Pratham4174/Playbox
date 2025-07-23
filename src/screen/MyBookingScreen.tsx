@@ -28,7 +28,7 @@ export default function MyBookingsScreen() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8091/api/bookings/user/${userId}`);
+      const response = await fetch(`http://192.168.1.9:8091/api/bookings/user/${userId}`);
       const data = await response.json();
 
       const now = new Date();

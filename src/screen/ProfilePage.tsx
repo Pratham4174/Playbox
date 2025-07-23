@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,7 +31,7 @@ const ProfileScreen = ({ navigation }: any) => {
         }
 
         const response = await fetch(
-          `http://localhost:8080/auth/user?phone=${user.phoneNumber}`
+          `http://192.168.1.9:8080/auth/user?phone=${user.phoneNumber}`
         );
         const data = await response.json();
         setUser(data);
@@ -47,17 +48,55 @@ const ProfileScreen = ({ navigation }: any) => {
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Cancel', 
+        style: 'cancel' 
+      },
       {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.removeItem('userId');
-          setUser(null);
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'PhoneLogin' }],
-          });
+          try {
+            // Get all keys from AsyncStorage
+            const allKeys = await AsyncStorage.getAllKeys();
+            
+            // Filter and remove all user-related keys
+            const userKeys = allKeys.filter(key => 
+              key === 'userId' ||
+              key === 'userToken' ||
+              key === 'userData' ||
+              key === 'arenaUser' ||
+              key === 'ownerId' ||
+              key === 'userName' ||
+              key === 'name' ||
+              key.startsWith('user_') // Example for prefixed keys
+            );
+            
+            // Remove all identified user keys
+            await AsyncStorage.multiRemove(userKeys);
+            
+            // Clear global state if using context/Redux
+            setUser(null);
+            
+            // Reset navigation stack completely
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'PhoneLogin' }],
+              })
+            );
+            
+            // Optional: Clear any cached images/data
+            // await ImageCache.clear();
+            
+          } catch (error) {
+            console.error('Logout error:', error);
+            // Fallback - still navigate to login screen
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'PhoneLogin' }],
+            });
+          }
         },
       },
     ]);

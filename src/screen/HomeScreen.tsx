@@ -1,4 +1,6 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions } from '@react-navigation/native';
 import axios from 'axios';
 import * as Location from 'expo-location';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -43,7 +45,7 @@ const sports = [
 ];
 
 export default function HomeScreen({ navigation }: any) {
-  const { user, location, setLocation } = useUser();
+  const { location, setLocation } = useUser();
   const [selectedSport, setSelectedSport] = useState<string>('All');
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [city, setCity] = useState<string | null>(location?.city || null);
@@ -51,15 +53,40 @@ export default function HomeScreen({ navigation }: any) {
   const displayedSports = showAllSports ? sports : sports.slice(0, 5);
   const [venues, setVenues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const { user, setUser } = useUser();
   useEffect(() => {
     fetchVenues();
+  }, []);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        if (!user?.phoneNumber) {
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(
+          `http://192.168.1.9:8080/auth/user?phone=${user.phoneNumber}`
+        );
+        const data = await response.json();
+        setUser(data);
+        await AsyncStorage.setItem('user', JSON.stringify(data));
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+        Alert.alert('Error', 'Failed to load user profile.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
   }, []);
 
   const fetchVenues = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8092/api/venues/all');
+      const response = await axios.get('http://192.168.1.9:8092/api/venues/all');
       setVenues(response.data);
     } catch (error) {
       console.error('Failed to fetch venues:', error);
@@ -82,7 +109,10 @@ export default function HomeScreen({ navigation }: any) {
       ),
       headerLeft: () => (
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={navigation.toggleDrawer}>
+          <TouchableOpacity 
+            onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+            style={styles.menuButton}
+          >
             <Ionicons name="menu" size={24} color="#2E8B57" />
           </TouchableOpacity>
           <Text style={styles.greeting}>Hey {user?.name || 'Player'}</Text>
@@ -580,5 +610,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 14,
+  },
+  menuButton: {
+    marginRight: 10,
   },
 });

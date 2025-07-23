@@ -82,8 +82,8 @@ export default function PhoneLoginScreen({ navigation }: any) {
   
       // API call
       const endpoint = isAdmin 
-        ? 'http://localhost:8092/api/arena-owners/send-otp' 
-        : 'http://localhost:8080/auth/send-otp';
+        ? 'http://192.168.1.9:8092/api/arena-owners/send-otp' 
+        : 'http://192.168.1.9:8080/auth/send-otp';
   
       const response = await fetch(endpoint, {
         method: 'POST',
