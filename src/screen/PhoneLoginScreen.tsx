@@ -6,6 +6,7 @@ import {
   Dimensions,
   Easing,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -25,6 +26,7 @@ export default function PhoneLoginScreen({ navigation }: any) {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const [isArenaOwner, setIsArenaOwner] = useState(false); 
+  const phoneInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     // Entry animations
@@ -82,8 +84,8 @@ export default function PhoneLoginScreen({ navigation }: any) {
   
       // API call
       const endpoint = isAdmin 
-        ? 'http://192.168.1.9:8092/api/arena-owners/send-otp' 
-        : 'http://192.168.1.9:8080/auth/send-otp';
+        ? 'http://192.168.1.8:8092/api/arena-owners/send-otp' 
+        : 'http://192.168.1.8:8080/auth/send-otp';
   
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -195,18 +197,27 @@ export default function PhoneLoginScreen({ navigation }: any) {
           ]}>
             <Text style={styles.countryCode}>+91</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Enter phone number"
-              placeholderTextColor="#A0A0A0"
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={(text) => setPhoneNumber(text.replace(/[^0-9]/g, ''))}
-              maxLength={10}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              autoFocus={true}
-            />
-            {phoneNumber ? (
+  style={styles.input}
+  placeholder="Enter phone number"
+  placeholderTextColor="#A0A0A0"
+  keyboardType="phone-pad"
+  value={phoneNumber}
+  onChangeText={(text) => {
+    const cleanedText = text.replace(/[^0-9]/g, '');
+    setPhoneNumber(cleanedText);
+    if (cleanedText.length === 10) {
+      Keyboard.dismiss();
+      phoneInputRef.current?.blur(); // Optional: explicitly blur the input
+    }
+  }}
+  maxLength={10}
+  onFocus={() => setIsFocused(true)}
+  onBlur={() => setIsFocused(false)}
+  autoFocus={true}
+  ref={phoneInputRef} // Proper ref assignment
+/>  
+
+    {phoneNumber ? (
               <TouchableOpacity 
                 onPress={() => setPhoneNumber('')}
                 style={styles.clearButton}

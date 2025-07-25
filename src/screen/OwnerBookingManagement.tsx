@@ -1,14 +1,14 @@
 import moment from 'moment';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -55,6 +55,8 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
   );
   
 
+
+  
   // Generate time slots from 6 AM to 11 PM
   const generateTimeSlots = (selectedDate: Date) => {
     const now = new Date();
@@ -92,67 +94,105 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
 
   // Fetch all bookings for the selected date, sport and court
   const fetchBookings = useCallback(async () => {
-    if (!selectedCourt || !selectedSport) return;
+  if (!selectedCourt || !selectedSport) return;
 
-    try {
-      const dateString = selectedDate.toISOString().split('T')[0];
-      const response = await fetch(
-        `http://192.168.1.9:8091/api/bookings/venue/${venue.id}?date=${dateString}&sport=${selectedSport}&courtId=${selectedCourt.id}`
-      );
+  try {
+    const dateString = selectedDate.toISOString().split('T')[0];
+    const response = await fetch(
+      `http://192.168.1.8:8091/api/bookings/venue/${venue.id}?date=${dateString}&sport=${selectedSport}&courtId=${selectedCourt.id}`
+    );
 
-      if (!response.ok) throw new Error('Failed to fetch bookings');
+    if (!response.ok) throw new Error('Failed to fetch bookings');
+    
+    const data = await response.json();
+    
+    // Double filter to ensure correct sport and court
+    const filteredBookings = data.filter((booking: any) => 
+      booking.sport.toLowerCase() === selectedSport.toLowerCase() && 
+      booking.courtId === selectedCourt.id
+    );
+    
+    setBookings(filteredBookings);
+
+    // Update booked slots
+    const slots: string[] = [];
+    filteredBookings.forEach((booking: any) => {
+      const start = new Date(booking.startTime);
+      const end = new Date(booking.endTime);
       
-      const data = await response.json();
-      setBookings(data);
-
-      // Update booked slots
-      const slots: string[] = [];
-      data.forEach((booking: any) => {
-        const start = new Date(booking.startTime);
-        const end = new Date(booking.endTime);
-        
-        let current = new Date(start);
-        while (current < end) {
-          const timeString = current.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          });
-          if (!slots.includes(timeString)) {
-            slots.push(timeString);
-          }
-          current.setHours(current.getHours() + 1);
+      let current = new Date(start);
+      while (current < end) {
+        const timeString = current.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+        if (!slots.includes(timeString)) {
+          slots.push(timeString);
         }
-      });
-      setBookedSlots(slots);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-      Alert.alert('Error', 'Failed to load bookings');
-    }
-  }, [selectedDate, selectedSport, selectedCourt, venue.id]);
+        current.setHours(current.getHours() + 1);
+      }
+    });
+    setBookedSlots(slots);
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    Alert.alert('Error', 'Failed to load bookings');
+  }
+}, [selectedDate, selectedSport, selectedCourt, venue.id]);
 
   // Fetch available courts for the selected sport
   const fetchCourts = useCallback(async () => {
-    if (!selectedSport) return;
-
+    if (!selectedSport) {
+      setCourts([]);
+      setSelectedCourt(null);
+      return;
+    }
+  
     try {
+      console.log(`Fetching courts for sport: ${selectedSport}, venue: ${venue.id}`);
+      
       const response = await fetch(
-        `http://192.168.1.9:8091/api/bookings/courts?venueId=${venue.id}&sport=${selectedSport}`
+        `http://192.168.1.8:8091/api/bookings/courts?venueId=${venue.id}&sport=${encodeURIComponent(selectedSport)}`
       );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
-      setCourts(data);
-
+      console.log('Received courts data:', data);
+      
+      // If the backend already filters, just use the data directly
+      setCourts(data || []);
+  
       // Auto-select the first court if available
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         setSelectedCourt(data[0]);
       } else {
         setSelectedCourt(null);
+        console.warn(`No courts found for sport: ${selectedSport}`);
       }
     } catch (error) {
       console.error('Error fetching courts:', error);
+      Alert.alert('Error', 'Failed to load courts for this sport');
+      setCourts([]);
+      setSelectedCourt(null);
     }
   }, [selectedSport, venue.id]);
 
+
+  useEffect(() => {
+    console.log('Selected sport changed:', selectedSport);
+    fetchCourts();
+  }, [selectedSport, fetchCourts]);
+  
+  useEffect(() => {
+    console.log('Courts updated:', courts);
+  }, [courts]);
+  
+  useEffect(() => {
+    console.log('Selected court updated:', selectedCourt);
+  }, [selectedCourt]);
   // Handle refresh
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -202,24 +242,58 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
     });
   };
 
-  const handleCancelBooking = async (bookingId: number) => {
-    try {
-      const response = await fetch(`http://192.168.1.9:8091/api/bookings/${bookingId}`, {
-        method: 'DELETE',
-      });
+  // const handleCancelBooking = async (bookingId: number) => {
+  //   try {
+  //     const response = await fetch(`http://192.168.1.8:8091/api/bookings/${bookingId}`, {
+  //       method: 'DELETE',
+  //     });
 
-      if (response.ok) {
-        Alert.alert('Success', 'Booking cancelled successfully');
-        fetchBookings();
-      } else {
-        throw new Error('Failed to cancel booking');
-      }
-    } catch (error) {
-      console.error('Error cancelling booking:', error);
-      Alert.alert('Error', 'Failed to cancel booking');
-    }
+  //     if (response.ok) {
+  //       Alert.alert('Success', 'Booking cancelled successfully');
+  //       fetchBookings();
+  //     } else {
+  //       throw new Error('Failed to cancel booking');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error cancelling booking:', error);
+  //     Alert.alert('Error', 'Failed to cancel booking');
+  //   }
+  // };
+
+  const getTodaysBookings = () => {
+    const todayString = selectedDate.toISOString().split('T')[0];
+    return bookings.filter(booking => {
+      const bookingDate = new Date(booking.startTime).toISOString().split('T')[0];
+      return bookingDate === todayString;
+    });
   };
 
+  const getTodaysAvailableSlots = () => {
+    const todaysBookings = getTodaysBookings();
+    const bookedSlotsToday: string[] = [];
+    
+    todaysBookings.forEach((booking) => {
+      const start = new Date(booking.startTime);
+      const end = new Date(booking.endTime);
+      
+      let current = new Date(start);
+      while (current < end) {
+        const timeString = current.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+        if (!bookedSlotsToday.includes(timeString)) {
+          bookedSlotsToday.push(timeString);
+        }
+        current.setHours(current.getHours() + 1);
+      }
+    });
+    
+    return timeSlots.length - bookedSlotsToday.length;
+  };
+
+  
   const renderTimeSlot = (time: string) => {
     const status = getSlotStatus(time);
     const booking = getBookingForSlot(time);
@@ -306,30 +380,34 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
       {/* Court Selection */}
       {courts.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Select Court</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.sportsContainer}
-          >
-            {courts.map((court) => (
-              <TouchableOpacity 
-                key={court.id}
-                style={[
-                  styles.sportButton,
-                  selectedCourt?.id === court.id && styles.selectedSportButton
-                ]}
-                onPress={() => setSelectedCourt(court)}
-              >
-                <Text style={[
-                  styles.sportText,
-                  selectedCourt?.id === court.id && styles.selectedSportText
-                ]}>
-                  {court.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {selectedSport && courts.length > 0 && (
+  <>
+    <Text style={styles.sectionTitle}>Select Court</Text>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.sportsContainer}
+    >
+      {courts.map((court) => (
+        <TouchableOpacity 
+          key={court.id}
+          style={[
+            styles.sportButton,
+            selectedCourt?.id === court.id && styles.selectedSportButton
+          ]}
+          onPress={() => setSelectedCourt(court)}
+        >
+          <Text style={[
+            styles.sportText,
+            selectedCourt?.id === court.id && styles.selectedSportText
+          ]}>
+            {court.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  </>
+)}
         </>
       )}
 
@@ -352,23 +430,23 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
 
       {/* Summary Stats */}
       <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{bookings.length}</Text>
-          <Text style={styles.statLabel}>Bookings</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {timeSlots.length - bookedSlots.length}
-          </Text>
-          <Text style={styles.statLabel}>Available</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            ₹{bookings.reduce((sum, booking) => sum + booking.price, 0)}
-          </Text>
-          <Text style={styles.statLabel}>Revenue</Text>
-        </View>
-      </View>
+  <View style={styles.statItem}>
+    <Text style={styles.statValue}>{getTodaysBookings().length}</Text>
+    <Text style={styles.statLabel}>Bookings</Text>
+  </View>
+  <View style={styles.statItem}>
+    <Text style={styles.statValue}>
+      {getTodaysAvailableSlots()}
+    </Text>
+    <Text style={styles.statLabel}>Free Slots</Text>
+  </View>
+  <View style={styles.statItem}>
+    <Text style={styles.statValue}>
+      ₹{getTodaysBookings().reduce((sum, booking) => sum + booking.price, 0)}
+    </Text>
+    <Text style={styles.statLabel}>Total Revenue</Text>
+  </View>
+</View>
 
       {/* Time Slots */}
       <Text style={styles.sectionTitle}>Time Slots</Text>
@@ -389,41 +467,42 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Calendar
-              current={selectedDate.toISOString().split('T')[0]}
-              onDayPress={handleDateSelect}
-              monthFormat={'MMMM yyyy'}
-              hideArrows={false}
-              minDate={new Date().toISOString().split('T')[0]}
-              markedDates={{
-                [selectedDate.toISOString().split('T')[0]]: {
-                  selected: true,
-                  selectedColor: '#2E8B57',
-                  selectedTextColor: '#fff',
-                },
-              }}
-              renderArrow={(direction) => (
-                <MaterialIcons 
-                  name={direction === 'left' ? 'chevron-left' : 'chevron-right'} 
-                  size={24} 
-                  color="#2E8B57" 
-                />
-              )}
-              theme={{
-                calendarBackground: '#fff',
-                textSectionTitleColor: '#2E8B57',
-                selectedDayBackgroundColor: '#2E8B57',
-                selectedDayTextColor: '#fff',
-                todayTextColor: '#2E8B57',
-                dayTextColor: '#333',
-                textDisabledColor: '#ccc',
-                arrowColor: '#2E8B57',
-                monthTextColor: '#2E8B57',
-                textMonthFontWeight: 'bold',
-                textMonthFontSize: 16,
-                textDayHeaderFontWeight: 'bold',
-              }}
-            />
+          <Calendar
+  current={selectedDate.toISOString().split('T')[0]}
+  onDayPress={handleDateSelect}
+  monthFormat={'MMMM yyyy'}
+  hideArrows={false}
+  // Remove this line ↓
+  // minDate={new Date().toISOString().split('T')[0]}
+  markedDates={{
+    [selectedDate.toISOString().split('T')[0]]: {
+      selected: true,
+      selectedColor: '#2E8B57',
+      selectedTextColor: '#fff',
+    },
+  }}
+  renderArrow={(direction) => (
+    <MaterialIcons 
+      name={direction === 'left' ? 'chevron-left' : 'chevron-right'} 
+      size={24} 
+      color="#2E8B57" 
+    />
+  )}
+  theme={{
+    calendarBackground: '#fff',
+    textSectionTitleColor: '#2E8B57',
+    selectedDayBackgroundColor: '#2E8B57',
+    selectedDayTextColor: '#fff',
+    todayTextColor: '#2E8B57',
+    dayTextColor: '#333',
+    textDisabledColor: '#ccc',
+    arrowColor: '#2E8B57',
+    monthTextColor: '#2E8B57',
+    textMonthFontWeight: 'bold',
+    textMonthFontSize: 16,
+    textDayHeaderFontWeight: 'bold',
+  }}
+/>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowCalendarModal(false)}

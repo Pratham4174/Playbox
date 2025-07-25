@@ -31,7 +31,7 @@ const ProfileScreen = ({ navigation }: any) => {
         }
 
         const response = await fetch(
-          `http://192.168.1.9:8080/auth/user?phone=${user.phoneNumber}`
+          `http://192.168.1.8:8080/auth/user?phone=${user.phoneNumber}`
         );
         const data = await response.json();
         setUser(data);

@@ -37,7 +37,7 @@ export default function OtpVerificationScreen({ route, navigation }: any) {
     }
 
     try {
-      const response = await fetch('http://192.168.1.9:8080/auth/verify-otp', {
+      const response = await fetch('http://192.168.1.8:8080/auth/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,16 +72,15 @@ export default function OtpVerificationScreen({ route, navigation }: any) {
       verified: true,
     });
 
-    const userResponse = await fetch(`http://192.168.1.9:8080/auth/user?phone=${phoneNumber}`);
+    const userResponse = await fetch(`http://192.168.1.8:8080/auth/user?phone=${phoneNumber}`);
     const userData = await userResponse.json();
 
     const userId = userData?.id;
-    const userName = userData?.name || '';
     if (!userId) throw new Error('User ID not found in response');
 
     await AsyncStorage.setItem('userId', userId.toString());
     await AsyncStorage.setItem('userName', userData.name || '');
-    await AsyncStorage.setItem('user', JSON.stringify(userData));
+    
 
     if (!userData.name || userData.name.trim() === '') {
       navigation.replace('UserSetup', { phoneNumber });
@@ -94,7 +93,7 @@ export default function OtpVerificationScreen({ route, navigation }: any) {
   const triggerShake = () => {
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      // Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
     ]).start();

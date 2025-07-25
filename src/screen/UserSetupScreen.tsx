@@ -18,7 +18,7 @@ export default function UserSetupScreen({ navigation, route }: any) {
 
   const handleContinue = async () => {
     try {
-      const response = await fetch('http://192.168.1.9:8080/auth/setup', { // use your actual IP instead of 192.168.1.5
+      const response = await fetch('http://192.168.1.8:8080/auth/setup', { // use your actual IP instead of 192.168.1.5
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

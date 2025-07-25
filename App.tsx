@@ -62,7 +62,7 @@ export default function App() {
 
         {/* <Stack.Screen name="VenueDetails" component={VenueDetailsScreen} options={{headerShown:false}} /> */}
         {/* This is your drawer */}
-        <Stack.Screen name="Main" component={MainDrawer} options={{ headerShown: false }} />
+        <Stack.Screen name="Main" component={MainDrawer} options={{ headerShown: false, gestureEnabled: false  }} />
 
 
         <Stack.Screen name="OwnerMain" component={OwnerDrawer} options={{ headerShown: false }}/>

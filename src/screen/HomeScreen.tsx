@@ -67,7 +67,7 @@ export default function HomeScreen({ navigation }: any) {
         }
 
         const response = await fetch(
-          `http://192.168.1.9:8080/auth/user?phone=${user.phoneNumber}`
+          `http://192.168.1.8:8080/auth/user?phone=${user.phoneNumber}`
         );
         const data = await response.json();
         setUser(data);
@@ -86,7 +86,7 @@ export default function HomeScreen({ navigation }: any) {
   const fetchVenues = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://192.168.1.9:8092/api/venues/all');
+      const response = await axios.get('http://192.168.1.8:8092/api/venues/all');
       setVenues(response.data);
     } catch (error) {
       console.error('Failed to fetch venues:', error);

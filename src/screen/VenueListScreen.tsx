@@ -17,7 +17,7 @@ const [venues, setVenues] = useState<Venue[]>([]);
   useEffect(() => {
     const fetchVenues = async () => {
       try {
-        const response = await fetch('http://192.168.1.9:8090/api/venues');
+        const response = await fetch('http://192.168.1.8:8090/api/venues');
         const data = await response.json();
         setVenues(data);
       } catch (err) {

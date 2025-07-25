@@ -82,7 +82,7 @@ export default function AddVenueScreen() {
         } as any);
   
         try {
-          const response = await fetch('http://192.168.1.9:8092/api/venues/upload', {
+          const response = await fetch('http://192.168.1.8:8092/api/venues/upload', {
             method: 'POST',
             body: formData,
             headers: {
@@ -134,7 +134,7 @@ export default function AddVenueScreen() {
     };
 
     try {
-      const response = await fetch(`http://192.168.1.9:8092/api/venues/add`, {
+      const response = await fetch(`http://192.168.1.8:8092/api/venues/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
