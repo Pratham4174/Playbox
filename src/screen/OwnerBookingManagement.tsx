@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -37,7 +38,15 @@ type Court = {
   id: number;
   name: string;
 };
-
+type TimeSlot = string;
+type BookingFormData = {
+  userName: string;
+  phone: string;
+  sport: string;
+  courtId: number | null;
+  startTime: string; // ISO string format
+  endTime: string;   // ISO string format
+};
 export default function OwnerBookingManagement({ route, navigation }: any) {
   const { venue } = route.params;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -53,9 +62,144 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
   const [selectedSport, setSelectedSport] = useState<string>(
     availableSports.length > 0 ? availableSports[0] : ''
   );
+
+  const [showAddBookingModal, setShowAddBookingModal] = useState(false);
+  const [newBooking, setNewBooking] = useState<BookingFormData>({
+    userName: '',
+    phone: '',
+    sport: selectedSport,
+    courtId: selectedCourt?.id || null,
+    startTime: '',
+    endTime: ''
+  });
+ 
+  const isPastTimeSlot = (date: Date, time: string): boolean => {
+    const now = new Date();
+    const [timeStr, period] = time.split(' ');
+    let hour = parseInt(timeStr.split(':')[0], 10);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
   
+    const slotDate = new Date(date);
+    slotDate.setHours(hour, 0, 0, 0);
+  
+    return slotDate < now;
+  };
 
+ // Utility function to convert Date to local ISO string without timezone offset
+const toLocalISOString = (date: Date) => {
+  const offset = date.getTimezoneOffset() * 60000; // offset in milliseconds
+  return new Date(date.getTime() - offset).toISOString().slice(0, -1);
+};
 
+const handleAddBookingClick = (timeSlot: TimeSlot) => {
+  // Parse the time slot string (e.g., "9:00 PM")
+  const [timeStr, period] = timeSlot.split(' ');
+  let hour = parseInt(timeStr.split(':')[0], 10);
+  
+  // Convert to 24-hour format
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  // Create Date objects in local time
+  const startTime = new Date(selectedDate);
+  startTime.setHours(hour, 0, 0, 0);
+  
+  const endTime = new Date(startTime);
+  endTime.setHours(hour + 1, 0, 0, 0);
+
+  // Debug logs to verify times
+  console.log('Local Times:', {
+    selectedSlot: timeSlot,
+    localStart: startTime.toString(),
+    localEnd: endTime.toString(),
+    isoStart: startTime.toISOString(),
+    isoEnd: endTime.toISOString(),
+    localISOStart: toLocalISOString(startTime),
+    localISOEnd: toLocalISOString(endTime)
+  });
+
+  // Update state with local ISO strings
+  setNewBooking({
+    userName: '',
+    phone: '',
+    sport: selectedSport,
+    courtId: selectedCourt?.id || null,
+    startTime: toLocalISOString(startTime),
+    endTime: toLocalISOString(endTime)
+  });
+
+  setShowAddBookingModal(true);
+};
+
+const handleCreateBooking = async () => {
+  if (!newBooking.userName || !newBooking.phone) {
+    Alert.alert('Error', 'Please fill in all required fields');
+    return;
+  }
+
+  try {
+    // Convert local ISO strings back to Date for verification
+    const startDate = new Date(newBooking.startTime + 'Z'); // Add Z to parse as UTC
+    const endDate = new Date(newBooking.endTime + 'Z');
+    
+    console.log('Creating booking with:', {
+      localStart: startDate.toString(),
+      localEnd: endDate.toString(),
+      sendingToAPI: {
+        startTime: newBooking.startTime,
+        endTime: newBooking.endTime
+      }
+    });
+
+    const response = await fetch('http://192.168.1.8:8091/api/bookings/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userName: newBooking.userName,
+        phoneNumber: newBooking.phone,
+        venueId: venue.id,
+        venueName: venue.name,
+        venueLocation: venue.location,
+        sport: newBooking.sport,
+        startTime: newBooking.startTime, // Using local ISO string
+        endTime: newBooking.endTime,     // Using local ISO string
+        ownerId: venue.ownerId,
+        courtId: newBooking.courtId,
+        courtName: courts.find(c => c.id === newBooking.courtId)?.name || '',
+        isActive: true,
+        slotType: getSlotType(newBooking.startTime),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Send timezone info
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create booking');
+    }
+
+    Alert.alert('Success', 'Booking created successfully');
+    setShowAddBookingModal(false);
+    fetchBookings(); // Refresh the bookings list
+  } catch (error: any) {
+    console.error('Error creating booking:', error);
+    Alert.alert('Error', error.message || 'Failed to create booking');
+  }
+};
+
+// Helper to determine slot type from local ISO string
+const getSlotType2 = (isoString: string) => {
+  const date = new Date(isoString + 'Z'); // Parse as UTC
+  const hours = date.getHours();
+  
+  if (hours < 12) return 'Morning';
+  if (hours < 17) return 'Afternoon';
+  return 'Evening';
+};
+  
   
   // Generate time slots from 6 AM to 11 PM
   const generateTimeSlots = (selectedDate: Date) => {
@@ -65,7 +209,7 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
     // Check if selected date is today
     const isToday = selectedDate.toDateString() === now.toDateString();
   
-    for (let hour = 6; hour <= 23; hour++) {
+    for (let hour = 0; hour <= 23; hour++) {
       const period = hour >= 12 ? 'PM' : 'AM';
       const displayHour = hour > 12 ? hour - 12 : hour;
       const timeString = `${displayHour}:00 ${period}`;
@@ -338,6 +482,15 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
     );
   };
 
+  
+  // Helper function to determine slot type
+  const getSlotType = (dateTime: string) => {
+    const hour = new Date(dateTime).getHours();
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
+  };
+
   return (
     <ScrollView 
       contentContainerStyle={styles.container}
@@ -449,15 +602,65 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
 </View>
 
       {/* Time Slots */}
-      <Text style={styles.sectionTitle}>Time Slots</Text>
-      <View style={styles.timeSlotsContainer}>
-        {timeSlots.map((time) => (
-          <View key={time}>
-            {renderTimeSlot(time)}
-          </View>
-        ))}
-      </View>
-
+      <View style={styles.timelineContainer}>
+{timeSlots.map((time, index) => {
+  const status = getSlotStatus(time);
+  const booking = getBookingForSlot(time);
+  const isFirstInBlock = index === 0 || getSlotStatus(timeSlots[index-1]) !== status;
+  const isLastInBlock = index === timeSlots.length-1 || getSlotStatus(timeSlots[index+1]) !== status;
+  const isPast = isPastTimeSlot(selectedDate, time);
+  
+  return (
+    <View key={time} style={[
+      styles.timelineSlot,
+      status === 'booked' && styles.timelineSlotBooked,
+      status === 'available' && styles.timelineSlotAvailable,
+      isPast &&status!=='booked' && styles.pastSlot, // Add this line
+      isFirstInBlock && styles.timelineSlotFirst,
+      isLastInBlock && styles.timelineSlotLast,
+    ]}>
+      <Text style={[
+        styles.timelineTimeLabel,
+        isPast && styles.pastTimeLabel // Add this line
+      ]}>{time}</Text>
+      
+      {status === 'booked' && booking ? (
+        <View style={styles.timelineBookingInfo}>
+          <Text style={styles.timelineBookingName} numberOfLines={1}>
+            {booking.userName}
+          </Text>
+          <Text style={styles.timelineBookingTime}>
+            {moment(booking.startTime).format('h:mm')}-{moment(booking.endTime).format('h:mm A')}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.timelineActionButtons}>
+          <TouchableOpacity 
+            style={[
+              styles.addBookingButton,
+              isPast && styles.disabledAddBookingButton // Add this line
+            ]}
+            onPress={isPast ? undefined : () => handleAddBookingClick(time)}
+            disabled={isPast}
+          >
+            <MaterialIcons 
+              name="add" 
+              size={18} 
+              color={isPast ? "#cccccc" : "#2E8B57"} 
+            />
+            <Text style={[
+              styles.addBookingButtonText,
+              isPast && styles.disabledAddBookingButtonText
+            ]}>
+              Add Booking
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+})}
+</View>
       {/* Calendar Modal */}
       <Modal
         visible={showCalendarModal}
@@ -472,8 +675,6 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
   onDayPress={handleDateSelect}
   monthFormat={'MMMM yyyy'}
   hideArrows={false}
-  // Remove this line ↓
-  // minDate={new Date().toISOString().split('T')[0]}
   markedDates={{
     [selectedDate.toISOString().split('T')[0]]: {
       selected: true,
@@ -512,11 +713,306 @@ export default function OwnerBookingManagement({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
+      {/* Add Booking Modal */}
+<Modal
+  visible={showAddBookingModal}
+  animationType="slide"
+  transparent={false}
+  onRequestClose={() => setShowAddBookingModal(false)}
+>
+  <View style={styles.enhancedModalContainer}>
+    {/* Enhanced Header with shadow and better spacing */}
+    <View style={styles.enhancedModalHeaderContainer}>
+      <View style={styles.enhancedModalHeader}>
+        <Text style={styles.enhancedModalTitle}>New Booking</Text>
+        <TouchableOpacity 
+          style={styles.closeIconContainer}
+          onPress={() => setShowAddBookingModal(false)}
+        >
+          <MaterialIcons name="close" size={24} color="#6B7280" />
+        </TouchableOpacity>
+      </View>
+    </View>
+
+    <ScrollView 
+      contentContainerStyle={styles.modalContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Information Card with improved styling */}
+      <View style={styles.infoCard}>
+        <View style={styles.infoRow}>
+          <View style={styles.infoIconContainer}>
+            <MaterialIcons name="calendar-today" size={20} color="#2E8B57" />
+          </View>
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoLabel}>Date</Text>
+            <Text style={styles.infoValue}>
+              {moment(selectedDate).format('dddd, MMMM D, YYYY')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.infoDivider} />
+
+        <View style={styles.infoRow}>
+          <View style={styles.infoIconContainer}>
+            <MaterialIcons name="access-time" size={20} color="#2E8B57" />
+          </View>
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoLabel}>Time Slot</Text>
+            <Text style={styles.infoValue}>
+              {moment(newBooking.startTime).format('h:mm A')} - {moment(newBooking.endTime).format('h:mm A')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.infoDivider} />
+
+        <View style={styles.infoRow}>
+          <View style={styles.infoIconContainer}>
+            <MaterialIcons name="sports" size={20} color="#2E8B57" />
+          </View>
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoLabel}>Sport</Text>
+            <Text style={styles.infoValue}>{selectedSport}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoDivider} />
+
+        <View style={styles.infoRow}>
+          <View style={styles.infoIconContainer}>
+            <MaterialIcons name="place" size={20} color="#2E8B57" />
+          </View>
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoLabel}>Court</Text>
+            <Text style={styles.infoValue}>
+              {selectedCourt?.name || 'Not selected'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Form Section with better typography */}
+      <Text style={styles.sectionTitle}>Customer Details</Text>
+      
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Full Name *</Text>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.enhancedInput}
+            placeholder="John Doe"
+            placeholderTextColor="#9CA3AF"
+            value={newBooking.userName}
+            onChangeText={(text) => setNewBooking({...newBooking, userName: text})}
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Phone Number *</Text>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.enhancedInput}
+            placeholder="98765 43210"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="phone-pad"
+            value={newBooking.phone}
+            onChangeText={(text) => setNewBooking({...newBooking, phone: text})}
+          />
+        </View>
+      </View>
+
+      {/* Action Buttons with better spacing and visual feedback */}
+      <View style={styles.enhancedButtonContainer}>
+        <TouchableOpacity 
+          style={[styles.enhancedButton, styles.cancelButton]}
+          onPress={() => setShowAddBookingModal(false)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[
+            styles.enhancedButton, 
+            styles.submitButton,
+            (!newBooking.userName || !newBooking.phone) && styles.disabledButton
+          ]}
+          onPress={handleCreateBooking}
+          disabled={!newBooking.userName || !newBooking.phone}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.submitButtonText}>Confirm Booking</Text>
+          <MaterialIcons name="arrow-forward" size={20} color="white" style={styles.buttonIcon} />
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  </View>
+</Modal>
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
+  enhancedModalHeaderContainer: {
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+        width: 0,
+        height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 10, // Ensures header stays above content when scrolling
+    paddingTop: 40,
+},
+  enhancedModalContainer: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  enhacedModalHeaderContainer: {
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  enhancedModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  enhancedModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  closeIconContainer: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  modalContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  infoCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  infoIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  inputWrapper: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  enhancedInput: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+  },
+  enhancedButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
+  enhancedButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  cancelButton: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginRight: 12,
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  submitButton: {
+    backgroundColor: '#2E8B57',
+  },
+  disabledButton: {
+    backgroundColor: '#A5B4FC',
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  buttonIcon: {
+    marginLeft: 8,
+  },
+
   container: {
     backgroundColor: '#fff',
     padding: 16,
@@ -570,12 +1066,7 @@ const styles = StyleSheet.create({
     color: '#2E8B57',
     marginHorizontal: 8,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2E8B57',
-    marginBottom: 12,
-  },
+
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -640,12 +1131,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    width: '90%',
-  },
+
   closeButton: {
     marginTop: 20,
     padding: 10,
@@ -675,9 +1161,7 @@ const styles = StyleSheet.create({
     color: '#2E8B57',
     marginTop: 4,
   },
-  cancelButton: {
-    padding: 8,
-  },
+
   timeSlot: {
     width: '100%',
     padding: 16,
@@ -727,5 +1211,137 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
   },
+  timelineContainer: {
+    marginBottom: 20,
+  },
+  timelineSlot: {
+    height: 60,
+    borderLeftWidth: 1,
+    borderLeftColor: '#e0e0e0',
+    paddingLeft: 8,
+    marginLeft: 40,
+    position: 'relative',
+  },
+  timelineSlotBooked: {
+    backgroundColor: '#ffebee',
+    borderLeftColor: '#f44336',
+  },
+  timelineSlotFirst: {
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  timelineSlotLast: {
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  timelineTimeLabel: {
+    position: 'absolute',
+    left: -40,
+    top: 0,
+    width: 36,
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  timelineBookingInfo: {
+    padding: 8,
+  },
+  timelineBookingName: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  timelineBookingTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  timelineSlotAvailable: {
+    backgroundColor: '#f0fff4',
+  },
+  timelineActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 8,
+    width: '100%',
+  },
+  addBookingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+  },
+  addBookingButtonText: {
+    color: '#2E8B57',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+  blockSlotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+  },
+  blockSlotButtonText: {
+    color: '#f44336',
+    marginLeft: 4,
+    fontSize: 12,
+  },
 
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  bookingInfoSection: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 20,
+  },
+
+  infoText: {
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pastTimeLabel: {
+    color: '#999',
+  },
+  disabledAddBookingButton: {
+    backgroundColor: '#f0f0f0',
+    borderColor: '#e0e0e0',
+  },
+  disabledAddBookingButtonText: {
+    color: '#999',
+  },
+  
 });
