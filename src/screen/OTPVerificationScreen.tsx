@@ -37,7 +37,7 @@ export default function OtpVerificationScreen({ route, navigation }: any) {
     }
 
     try {
-      const response = await fetch('http://192.168.1.8:8080/auth/verify-otp', {
+      const response = await fetch('http://192.168.1.11:8080/auth/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ export default function OtpVerificationScreen({ route, navigation }: any) {
       verified: true,
     });
 
-    const userResponse = await fetch(`http://192.168.1.8:8080/auth/user?phone=${phoneNumber}`);
+    const userResponse = await fetch(`http://192.168.1.11:8080/auth/user?phone=${phoneNumber}`);
     const userData = await userResponse.json();
 
     const userId = userData?.id;

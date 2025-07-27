@@ -19,7 +19,7 @@ const ArenaOwnerRegister = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post("http://192.168.1.8:8092/api/arena-owners/register", formData);
+      const response = await axios.post("http://192.168.1.11:8092/api/arena-owners/register", formData);
       setStatus("Arena owner registered successfully!");
       console.log("Success:", response.data);
     } catch (error) {

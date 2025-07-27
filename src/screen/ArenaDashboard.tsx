@@ -18,8 +18,8 @@ import {
   View
 } from 'react-native';
 
-const API_BASE = 'http://192.168.1.8:8092/api/venues';
-const availableSports = ["Cricket", "Badminton", "Football", "Snooker", "Swimming"];
+const API_BASE = 'http://192.168.1.11:8092/api/venues';
+const availableSports = ["Cricket", "Badminton", "Football", "Snooker", "Swimming","Pickleball"];
 
 type Venue = {
   id: number;

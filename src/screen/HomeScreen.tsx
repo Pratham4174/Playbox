@@ -16,6 +16,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -44,6 +45,8 @@ const sports = [
   'Swimming �'
 ];
 
+
+
 export default function HomeScreen({ navigation }: any) {
   const { location, setLocation } = useUser();
   const [selectedSport, setSelectedSport] = useState<string>('All');
@@ -54,6 +57,53 @@ export default function HomeScreen({ navigation }: any) {
   const [venues, setVenues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, setUser } = useUser();
+  const [activeIndices, setActiveIndices] = useState<Record<number, number>>({});
+  const [searchText, setSearchText] = useState('');
+
+  const updateActiveIndex = (venueId: number, index: number) => {
+    setActiveIndices(prev => ({ ...prev, [venueId]: index }));
+  };
+
+
+  const clearSearch = () => {
+    setSearchText('');
+  };
+
+  const filterVenues = () => {
+    let filtered = venues;
+
+    // First filter by sport if one is selected
+    if (selectedSport !== 'All') {
+      filtered = filtered.filter((venue) => {
+        return venue.sportPrices?.some((sportPrice: { sport: string }) => {
+          const venueSport = sportPrice.sport?.trim().toLowerCase();
+          const selected = selectedSport.trim().toLowerCase();
+          return venueSport === selected;
+        });
+      });
+    }
+
+    // Then filter by search text if any
+    if (searchText.trim() !== '') {
+      const searchTerm = searchText.trim().toLowerCase();
+      filtered = filtered.filter((venue) => {
+        return (
+          venue.name.toLowerCase().includes(searchTerm) ||
+          venue.location.toLowerCase().includes(searchTerm) ||
+          venue.city.toLowerCase().includes(searchTerm) ||
+          venue.sportPrices?.some((sp: { sport: string }) => 
+            sp.sport.toLowerCase().includes(searchTerm)
+          )
+        );
+      });
+    }
+
+    return filtered;
+  };
+
+  const filteredVenues = filterVenues();
+
+
   useEffect(() => {
     fetchVenues();
   }, []);
@@ -67,7 +117,7 @@ export default function HomeScreen({ navigation }: any) {
         }
 
         const response = await fetch(
-          `http://192.168.1.8:8080/auth/user?phone=${user.phoneNumber}`
+          `http://192.168.1.11:8080/auth/user?phone=${user.phoneNumber}`
         );
         const data = await response.json();
         setUser(data);
@@ -86,7 +136,7 @@ export default function HomeScreen({ navigation }: any) {
   const fetchVenues = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://192.168.1.8:8092/api/venues/all');
+      const response = await axios.get('http://192.168.1.11:8092/api/venues/all');
       setVenues(response.data);
     } catch (error) {
       console.error('Failed to fetch venues:', error);
@@ -155,10 +205,21 @@ export default function HomeScreen({ navigation }: any) {
       Alert.alert('Error', 'Failed to fetch location');
     }
   };
+  const getSportNameWithoutEmoji = (sportWithEmoji: string) => {
+    return sportWithEmoji.replace(/\p{Emoji}/gu, '').trim();
+  };
+  // const filteredVenues = selectedSport === 'All' 
+  // ? venues 
+  // : venues.filter((venue) => {
+  //     // Check if any of the sportPrices match the selected sport
+  //     return venue.sportPrices?.some((sportPrice: { sport: string; }) => {
+  //       const venueSport = sportPrice.sport?.trim().toLowerCase();
+  //       const selected = selectedSport.trim().toLowerCase();
+  //       return venueSport === selected;
+  //     });
+  //   });
 
-  const filteredVenues = selectedSport === 'All' ? venues : venues.filter((v) => v.sport === selectedSport);
-
-  const renderVenueCard = ({ item }: any) => {
+  const renderVenueCard = ({ item, index }: any) => {
     // Calculate minimum price
     const minPrice = item.sportPrices?.reduce((min: number, sport: any) => {
       const price = parseFloat(sport.pricePerHour);
@@ -171,27 +232,53 @@ export default function HomeScreen({ navigation }: any) {
         style={styles.card}
       >
         {/* Image Slider */}
-        {item.images && item.images.length > 0 ? (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.imageSlider}
-          >
-            {item.images.map((img: any, index: number) => (
-              <Image
-                key={index}
-                source={{ uri: img.imageUrl }}
-                style={styles.sliderImage}
-                resizeMode="cover"
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.noImagePlaceholder}>
-            <MaterialIcons name="sports" size={40} color="#fff" />
-          </View>
-        )}
+        <View style={styles.sliderContainer}>
+          {item.images && item.images.length > 0 ? (
+            <>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.imageSlider}
+                snapToInterval={width - 32} // This is crucial
+                snapToAlignment="center" // Aligns to center
+                decelerationRate="fast" // Makes it feel snappier
+                onScroll={(event) => {
+                  const slideSize = event.nativeEvent.layoutMeasurement.width;
+                  const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
+                  updateActiveIndex(item.id, index);
+                }}
+                scrollEventThrottle={16}
+              >
+                {item.images.map((img: any, imgIndex: number) => (
+                  <View key={imgIndex} style={{ width: width - 32 }}>
+                    <Image
+                      source={{ uri: img.imageUrl }}
+                      style={styles.sliderImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+              {/* Pagination indicators */}
+              <View style={styles.pagination}>
+                {item.images.map((_: any, imgIndex: number) => (
+                  <View
+                    key={imgIndex}
+                    style={[
+                      styles.paginationDot,
+                      activeIndices[item.id] === imgIndex ? styles.activeDot : styles.inactiveDot
+                    ]}
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={styles.noImagePlaceholder}>
+              <MaterialIcons name="sports" size={40} color="#fff" />
+            </View>
+          )}
+        </View>
   
         {/* Venue Info */}
         <View style={styles.cardBody}>
@@ -226,103 +313,132 @@ export default function HomeScreen({ navigation }: any) {
       </Pressable>
     );
   };
+ 
   return (
     <SafeAreaView style={styles.safeArea}>
-    <View style={styles.container}>
-      {/* Search Bar */}
-      <TouchableOpacity 
-        style={styles.searchWrapper}
-        onPress={() => navigation.navigate('RecentSearches')}
-      >
-        <Ionicons name="search" size={18} color="#888" style={styles.searchIcon} />
-        <Text style={styles.searchPlaceholder}>Search venues or locations</Text>
-      </TouchableOpacity>
-
-      {/* Sports Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Popular Sports</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sportsContainer}
-        >
-          {displayedSports.map((sport, index) => {
-            const emoji = sport.match(/\p{Emoji}/u)?.[0] || '🏃‍♂️';
-            const name = sport.replace(/\p{Emoji}/gu, '').trim();
-            
-            return (
-              <TouchableOpacity 
-                key={index}
-                style={styles.sportButton}
-                onPress={() => navigation.navigate('SportVenues', { sport })}
-              >
-                <Text style={styles.sportEmoji}>{emoji}</Text>
-                <Text style={styles.sportName}>{name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        <TouchableOpacity 
-          style={styles.toggleButton}
-          onPress={() => setShowAllSports(!showAllSports)}
-        >
-            <Text style={styles.toggleText}>
-      {showAllSports ? 'Show Less' : 'Show More →'}
-    </Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search venues or locations"
+          placeholderTextColor="#888"
+          value={searchText}
+          onChangeText={setSearchText}
+          returnKeyType="search"
+        />
+        {searchText.length > 0 && (
+          <TouchableOpacity onPress={clearSearch}>
+            <Ionicons name="close-circle" size={20} color="#888" />
+          </TouchableOpacity>
+        )}
       </View>
-
-      {/* Venues List */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Nearby Venues</Text>
+  
+        {/* Sports Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Popular Sports</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sportsContainer}
+          >
+           {displayedSports.map((sport, index) => {
+  const emoji = sport.match(/\p{Emoji}/u)?.[0] || '🏃‍♂️';
+  const name = sport.replace(/\p{Emoji}/gu, '').trim();
+  const isSelected = selectedSport === name;
+  
+  return (
+    <TouchableOpacity 
+      key={index}
+      style={[
+        styles.sportButton,
+        isSelected && styles.selectedSportButton  // Add selected style
+      ]}
+      onPress={() => {
+        // Set the selected sport to filter venues
+        setSelectedSport(isSelected ? 'All' : name);
+      }}
+    >
+      <Text style={styles.sportEmoji}>{emoji}</Text>
+      <Text style={[
+        styles.sportName,
+        isSelected && styles.selectedSportText  // Add selected text style
+      ]}>
+        {name}
+      </Text>
+    </TouchableOpacity>
+  );
+})}
+          </ScrollView>
+          <TouchableOpacity 
+            style={styles.toggleButton}
+            onPress={() => setShowAllSports(!showAllSports)}
+          >
+            <Text style={styles.toggleText}>
+              {showAllSports ? 'Show Less' : 'Show More →'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+  
+        {/* Venues List - This will take up remaining space */}
+        <View style={styles.listContainer}>
+        <Text style={styles.sectionTitle}>
+          {searchText ? 'Search Results' : 'Nearby Venues'}
+        </Text>
+        
         {loading ? (
-          <ActivityIndicator size="large" color="#2E8B57" style={styles.loader} />
+          <ActivityIndicator size="large" color="#2E8B57" />
+        ) : filteredVenues.length === 0 ? (
+          <Text style={styles.noResultsText}>
+            {searchText ? 'No matching venues found' : 'No venues available'}
+          </Text>
         ) : (
           <FlatList
             data={filteredVenues}
             renderItem={renderVenueCard}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.venueList}
-            showsVerticalScrollIndicator={false}
           />
         )}
       </View>
-
-      {/* Location Modal */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={locationModalVisible}
-        onRequestClose={() => setLocationModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Enable Location</Text>
-            <Text style={styles.modalText}>
-              Allow us to access your location to show venues nearby.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.secondaryButton}
-                onPress={() => setLocationModalVisible(false)}
-              >
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.primaryButton}
-                onPress={detectLocation}
-              >
-                <Text style={styles.primaryButtonText}>Allow Location</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <View style={styles.footerWrapper}>
+  
+        {/* Footer - Now at natural bottom of layout */}
+        <View style={styles.footerWrapper}>
           <Footer navigation={navigation} active="Home" />
         </View>
-    </View>
-    
+  
+        {/* Location Modal */}
+        <Modal
+          transparent
+          animationType="fade"
+          visible={locationModalVisible}
+          onRequestClose={() => setLocationModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Enable Location</Text>
+              <Text style={styles.modalText}>
+                Allow us to access your location to show venues nearby.
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={styles.secondaryButton}
+                  onPress={() => setLocationModalVisible(false)}
+                >
+                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.primaryButton}
+                  onPress={detectLocation}
+                >
+                  <Text style={styles.primaryButtonText}>Allow Location</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 }
@@ -450,11 +566,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   imageSlider: {
-    height: 180,
+    width: '100%',
+    height: 200,
+    
   },
   sliderImage: {
     width: width - 32,
-    height: 180,
+    height: 200,
   },
   noImagePlaceholder: {
     width: '100%',
@@ -613,5 +731,67 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     marginRight: 10,
+  },
+  sliderContainer: {
+    position: 'relative',
+    height: 200,
+    
+  },
+ 
+  pagination: {
+    position: 'absolute',
+    bottom: 10,
+    flexDirection: 'row',
+    alignSelf: 'center',
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: '#2E8B57',
+  },
+  inactiveDot: {
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  listContainer: {
+    flex: 1, // Takes up remaining space
+    paddingHorizontal: 16,
+    marginBottom: 60, // Space for footer
+  },
+  selectedSportButton: {
+    backgroundColor: '#2E8B57',
+  },
+  selectedSportText: {
+    color: '#fff',
+  },
+  noResultsText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#666',
+    fontSize: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 10,
   },
 });

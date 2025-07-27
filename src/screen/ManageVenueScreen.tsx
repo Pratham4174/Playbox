@@ -13,7 +13,7 @@ import {
   View
 } from 'react-native';
 import { SportPrice } from '../type/types';
-const availableSports = ["Cricket", "Badminton", "Football", "Snooker", "Swimming"];
+const availableSports = ["Cricket", "Badminton", "Football", "Snooker", "Swimming", "Pickleball"];
 
 interface Venue {
   id: number;
@@ -77,7 +77,7 @@ const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
         return;
       }
 
-      const response = await fetch(`http://192.168.1.8:8092/api/venues/owner/${ownerId}`);
+      const response = await fetch(`http://192.168.1.11:8092/api/venues/owner/${ownerId}`);
       if (!response.ok) throw new Error("Failed to fetch venues");
 
       const data = await response.json();
@@ -157,7 +157,7 @@ const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
     };
 
     try {
-      const response = await fetch(`http://192.168.1.8:8092/api/venues/update/${editVenue.id}`, {
+      const response = await fetch(`http://192.168.1.11:8092/api/venues/update/${editVenue.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedVenue),

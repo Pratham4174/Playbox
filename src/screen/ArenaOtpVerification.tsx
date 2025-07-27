@@ -37,7 +37,7 @@ export default function ArenaOtpVerificationScreen({ route, navigation }: any) {
     }
 
     try {
-      const response = await fetch('http://192.168.1.8:8092/api/arena-owners/verify-otp', {
+      const response = await fetch('http://192.168.1.11:8092/api/arena-owners/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export default function ArenaOtpVerificationScreen({ route, navigation }: any) {
     });
 
     // Fetch owner details
-    const userResponse = await fetch(`http://192.168.1.8:8092/api/arena-owners/by-phone?phoneNumber=${phoneNumber}`);
+    const userResponse = await fetch(`http://192.168.1.11:8092/api/arena-owners/by-phone?phoneNumber=${phoneNumber}`);
     const userData = await userResponse.json();
 
     const userId = userData?.id;
@@ -127,7 +127,7 @@ export default function ArenaOtpVerificationScreen({ route, navigation }: any) {
 
   const handleResend = async () => {
     try {
-      const response = await fetch('http://192.168.1.8:8092/api/arena-owners/send-otp', {
+      const response = await fetch('http://192.168.1.11:8092/api/arena-owners/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

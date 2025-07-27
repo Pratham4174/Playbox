@@ -154,7 +154,7 @@ const handleCreateBooking = async () => {
       }
     });
 
-    const response = await fetch('http://192.168.1.8:8091/api/bookings/create', {
+    const response = await fetch('http://192.168.1.11:8091/api/bookings/create', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -243,7 +243,7 @@ const getSlotType2 = (isoString: string) => {
   try {
     const dateString = selectedDate.toISOString().split('T')[0];
     const response = await fetch(
-      `http://192.168.1.8:8091/api/bookings/venue/${venue.id}?date=${dateString}&sport=${selectedSport}&courtId=${selectedCourt.id}`
+      `http://192.168.1.11:8091/api/bookings/venue/${venue.id}?date=${dateString}&sport=${selectedSport}&courtId=${selectedCourt.id}`
     );
 
     if (!response.ok) throw new Error('Failed to fetch bookings');
@@ -296,7 +296,7 @@ const getSlotType2 = (isoString: string) => {
       console.log(`Fetching courts for sport: ${selectedSport}, venue: ${venue.id}`);
       
       const response = await fetch(
-        `http://192.168.1.8:8091/api/bookings/courts?venueId=${venue.id}&sport=${encodeURIComponent(selectedSport)}`
+        `http://192.168.1.11:8091/api/bookings/courts?venueId=${venue.id}&sport=${encodeURIComponent(selectedSport)}`
       );
       
       if (!response.ok) {
@@ -388,7 +388,7 @@ const getSlotType2 = (isoString: string) => {
 
   // const handleCancelBooking = async (bookingId: number) => {
   //   try {
-  //     const response = await fetch(`http://192.168.1.8:8091/api/bookings/${bookingId}`, {
+  //     const response = await fetch(`http://192.168.1.11:8091/api/bookings/${bookingId}`, {
   //       method: 'DELETE',
   //     });
 
@@ -414,8 +414,11 @@ const getSlotType2 = (isoString: string) => {
 
   const getTodaysAvailableSlots = () => {
     const todaysBookings = getTodaysBookings();
-    const bookedSlotsToday: string[] = [];
+    const now = new Date();
+    const isToday = selectedDate.toDateString() === now.toDateString();
     
+    // 1. Get all booked slots
+    const bookedSlotsToday: string[] = [];
     todaysBookings.forEach((booking) => {
       const start = new Date(booking.startTime);
       const end = new Date(booking.endTime);
@@ -433,10 +436,35 @@ const getSlotType2 = (isoString: string) => {
         current.setHours(current.getHours() + 1);
       }
     });
+  
+    // 2. Calculate total valid slots (excluding past slots if today)
+    let totalValidSlots = 0;
+    timeSlots.forEach(time => {
+      // If today, check if slot is in the past
+      if (isToday) {
+        const [timeStr, period] = time.split(' ');
+        let hour = parseInt(timeStr.split(':')[0], 10);
+        
+        // Convert to 24-hour format
+        if (period === 'PM' && hour !== 12) hour += 12;
+        if (period === 'AM' && hour === 12) hour = 0;
+  
+        const slotTime = new Date(selectedDate);
+        slotTime.setHours(hour, 0, 0, 0);
+        
+        if (slotTime < now) {
+          return; // Skip past slots
+        }
+      }
+      totalValidSlots++;
+    });
+  
+    // 3. Subtract booked slots from total valid slots
+    const availableSlots = totalValidSlots - bookedSlotsToday.length;
     
-    return timeSlots.length - bookedSlotsToday.length;
+    // Ensure we don't return negative numbers
+    return Math.max(0, availableSlots); 
   };
-
   
   const renderTimeSlot = (time: string) => {
     const status = getSlotStatus(time);

@@ -125,7 +125,7 @@ const fetchBookedSlots = useCallback(async (courtId: number) => {
     const dateString = selectedDate.toISOString().split('T')[0];
     
     const response = await fetch(
-      `http://192.168.1.8:8091/api/bookings/venuebycourt/${venue.id}/date/${dateString}?sport=${selectedSport}&courtId=${courtId}`
+      `http://192.168.1.11:8091/api/bookings/venuebycourt/${venue.id}/date/${dateString}?sport=${selectedSport}&courtId=${courtId}`
     );
 
     if (!response.ok) throw new Error('Failed to fetch booked slots');
@@ -167,7 +167,7 @@ useEffect(() => {
     try {
       // Fetch available courts if more than one court is there in venue.
       const courtsResponse = await fetch(
-        `http://192.168.1.8:8091/api/bookings/courts?venueId=${venue.id}&sport=${selectedSport}`
+        `http://192.168.1.11:8091/api/bookings/courts?venueId=${venue.id}&sport=${selectedSport}`
       );
       const courtsData = await courtsResponse.json();
       setCourts(courtsData);
@@ -361,7 +361,7 @@ const handleMakePayment = async () => {
     };
     console.log('Booking Payload:', bookingPayload);
 
-    const response = await fetch('http://192.168.1.8:8091/api/bookings/create', {
+    const response = await fetch('http://192.168.1.11:8091/api/bookings/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bookingPayload),
